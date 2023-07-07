@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "config.h": "c"
+    },
+    "rust-analyzer.linkedProjects": [
+        "./src/yhc/Cargo.toml"
+    ]
+}
