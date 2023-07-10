@@ -37,7 +37,6 @@ pub mod platform {
 
     pub type WORD_TYPE = i64;
 
-
     /* fixed size types, always the same size. Alias to different things on different platforms */
     // signed INT*_TYPE
     pub type Int8 = i8;
@@ -55,11 +54,16 @@ pub mod platform {
     pub type Float32 = f32;
     pub type Float64 = f64;
 
+    /* native int and word types, these *MUST* be the same as the size of a void* */
     pub type Int = i64;
     pub type UInt = u64;
-}
+    pub type Word = u64;
 
-//C type unsigned WORD_TYPE  Word;
+    /* native half int sizes, *MUST* be half the size of native int, whatever that is */
+    pub type HInt = i32;
+    pub type HUInt = u32;
+    pub type HWord = u32;
+}
 
 /* native half int sizes, *MUST* be half the size of native int, whatever that is */
 //C type HALF_TYPE           HInt;

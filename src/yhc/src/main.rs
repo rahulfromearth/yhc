@@ -13,8 +13,8 @@ use types::types::Bool;
 
 // main.h
 
-static DEFAULT_HEAP_SIZE: u32 = 16 * 1024 * 1024;
-static DEFAULT_MAX_STACK_SIZE: u32 = 1 * 1024 * 1024;
+const DEFAULT_HEAP_SIZE: u32 = 16 * 1024 * 1024;
+const DEFAULT_MAX_STACK_SIZE: u32 = 1 * 1024 * 1024;
 
 struct Options {
   heapSize: UInt,
