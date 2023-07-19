@@ -4,6 +4,7 @@
 #![allow(non_upper_case_globals)]
 #![allow(unused_variables)]
 
+// https://www.reddit.com/r/rust/comments/cfybfa/statically_borrowing_command_line_arguments/
 mod platform;
 mod types;
 
@@ -86,26 +87,26 @@ fn parseSize(arg: String,  p: String) -> UInt {
       usage();
     }
 
-    std::libc::strtoul();
+    // std::libc::strtoul();
 
 
     // Int mult = 0;
 
-    let mult = match  (*end++) {
+    let mult = match (*end++) {
     'b' => 1,
     'K' => 1024,
-    'M' => 1024*1024,
-    'G' => 1024*1024*1024,
+    'M' => 1024 * 1024,
+    'G' => 1024 * 1024 * 1024,
     _ => {
-      eprintln!( "ERROR: unknown size argument '{}' after '{}'", p, arg);
-      eprintln!( "       expected:  digit*(b|K|M|G)");
-      eprintln!( "           e.g. 3000b, 10K, 12M, 1G");
-      usage();
-    }
+        eprintln!("ERROR: unknown size argument '{}' after '{}'", p, arg);
+        eprintln!("       expected:  digit*(b|K|M|G)");
+        eprintln!("           e.g. 3000b, 10K, 12M, 1G");
+        usage();
+      }
     };
 
-    if (*end){
-      eprintln!( "ERROR: unexpected '{}' after size argument '{}'", *end, p);
+    if *end != c_null {
+      eprintln!("ERROR: unexpected '{}' after size argument '{}'", *end, p);
       usage();
     }
 
@@ -193,7 +194,7 @@ fn parseArgs() -> String {
     }
 
     /* store argument information */
-    // G_argc = argc - i;
+    unsafe { G_argc.as_mut_ptr.write(std::env::args().len() - i) }
     // G_argv = &argv[i];
 
     /* get yhc base path */
