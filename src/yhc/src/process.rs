@@ -68,7 +68,7 @@ struct Process {
 
 
 /* list of free processes */
-static G_freeProcList: &Process = NULL;
+static mut G_freeProcList: &Process = unsafe {mem::uninitialized()};
 
 /* list of all processes */
 G_procList: &Process = NULL;
@@ -77,7 +77,7 @@ G_procList: &Process = NULL;
 G_proc: &Process = NULL;
 
 /* the current process ID */
-static G_nextID: ProcessID = 0;
+static mut G_nextID: ProcessID = 0;
 
 /* the number of instructions before a swith */
 G_insBeforeSwitch: Int = 0;
