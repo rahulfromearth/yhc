@@ -35,7 +35,10 @@ type UByte = u8;
 #[cfg(target_pointer_width = "64")]
 pub mod platform {
 
+    // config.h
     pub type WORD_TYPE = i64;
+    pub type HALF_TYPE = i32;
+    pub type QUARTER_TYPE = i16;
 
     /* fixed size types, always the same size. Alias to different things on different platforms */
     // signed INT*_TYPE
@@ -54,6 +57,10 @@ pub mod platform {
     pub type Float32 = f32;
     pub type Float64 = f64;
 
+    /* native byte sizes, should always be a single byte */
+    pub type Byte = i8; // Int8
+    pub type UByte = u8; // UInt8
+
     /* native int and word types, these *MUST* be the same as the size of a void* */
     pub type Int = i64;
     pub type UInt = u64;
@@ -63,6 +70,11 @@ pub mod platform {
     pub type HInt = i32;
     pub type HUInt = u32;
     pub type HWord = u32;
+
+    /* native quarter int sizes, *MUST* be 1/4 the size of a native int */
+    pub type QInt = i16; // QUARTER_TYPE
+    pub type QUInt = u16; // unsigned QUARTER_TYPE
+    pub type QWord = u16; // unsigned QUARTER_TYPE
 }
 
 /* native half int sizes, *MUST* be half the size of native int, whatever that is */

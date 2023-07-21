@@ -5,13 +5,22 @@
 #![allow(unused_variables)]
 
 // https://www.reddit.com/r/rust/comments/cfybfa/statically_borrowing_command_line_arguments/
+// https://stackoverflow.com/questions/26378842/how-do-i-overcome-match-arms-with-incompatible-types-for-structs-implementing-sa
+
+mod basepath;
+mod hashtable;
+mod heap;
+mod module;
+mod node;
 mod platform;
 mod types;
 
+use libc;
 use platform::platform::{Int64, UInt};
-use std::mem::MaybeUninit;
-use std::{env::Args, process::exit};
+use std::process;
 use types::types::Bool;
+
+use std::ffi::CStr;
 
 // main.h
 
@@ -27,13 +36,13 @@ struct Options {
 }
 
 /* global variable storing the program name and arguments */
-static mut G_argc: i32 = 0;
-static mut G_argv: MaybeUninit<Args> = MaybeUninit::uninit();
-static mut G_progName: MaybeUninit<&str> = MaybeUninit::uninit();
-static mut G_options: MaybeUninit<Options> = MaybeUninit::uninit();
-static mut G_yhcBasePath: MaybeUninit<&str> = MaybeUninit::uninit(); // Char*
+static mut G_argc: usize = 0;
+static mut G_argv: Option<Vec<String>> = None;
+static mut G_progName: Option<String> = None;
+static mut G_options: Option<Options> = None;
+static mut G_yhcBasePath: Option<String> = None; // Char*
 
-static mut G_insCount: MaybeUninit<Int64> = MaybeUninit::uninit();
+static mut G_insCount: Option<Int64> = None;
 
 //C #ifndef VERSION
 //C # define VERSION "Unversioned"
@@ -52,12 +61,12 @@ fn usage() {
     //C   eprintln!("\t\tCompiled with Hat support");
     //C #endif
 
-    println!("DEBUG: {:?}\n {:?}", DEFAULT_HEAP_SIZE, unsafe {
-        G_options.assume_init()
-    });
+    // println!("DEBUG: {:?}\n {:?}", DEFAULT_HEAP_SIZE, unsafe {
+    //     G_options.assume_init()
+    // });
 
     eprintln!("\nusage: {} [options] classfile [args]", unsafe {
-        G_progName.assume_init()
+        G_progName.as_ref().unwrap()
     });
 
     eprintln!("");
@@ -72,42 +81,50 @@ fn usage() {
     eprintln!("  -dump                - don't execute bytecode, just print it and exit");
     eprintln!("");
 
-    exit(1);
+    process::exit(1);
 }
 
 /* parse a size argument */
 // Int
-fn parseSize(arg: String,  p: String) -> UInt {
-    char* end;
-  
-    Int ret = (Int)strtoul(p, &end, 10);
-  
+fn parseSize(arg: String, p: String) -> u64 {
+    let mut endptr: *mut libc::c_char = std::ptr::null_mut();
+
+    // Int ret = (Int)strtoul(p, &end, 10);
+    let ret = unsafe { libc::strtoul(p.as_ptr() as *const libc::c_char, &mut endptr, 10) };
+    let end = unsafe {
+        CStr::from_ptr(endptr)
+            .to_str()
+            .expect("Invalid UTF-8 sequence")
+    };
+
     if end == p {
-      eprintln!( "ERROR: expected size argument after '{}'", arg);
-      usage();
+        eprintln!("ERROR: expected size argument after '{}'", arg);
+        usage();
     }
-
-    // std::libc::strtoul();
-
 
     // Int mult = 0;
 
-    let mult = match (*end++) {
-    'b' => 1,
-    'K' => 1024,
-    'M' => 1024 * 1024,
-    'G' => 1024 * 1024 * 1024,
-    _ => {
-        eprintln!("ERROR: unknown size argument '{}' after '{}'", p, arg);
-        eprintln!("       expected:  digit*(b|K|M|G)");
-        eprintln!("           e.g. 3000b, 10K, 12M, 1G");
-        usage();
-      }
+    let mult = match end {
+        "b" => 1,
+        "K" => 1024,
+        "M" => 1024 * 1024,
+        "G" => 1024 * 1024 * 1024,
+        _ => {
+            eprintln!("ERROR: unknown size argument '{}' after '{}'", p, arg);
+            eprintln!("       expected:  digit*(b|K|M|G)");
+            eprintln!("           e.g. 3000b, 10K, 12M, 1G");
+            usage();
+            unreachable!()
+        }
     };
 
-    if *end != c_null {
-      eprintln!("ERROR: unexpected '{}' after size argument '{}'", *end, p);
-      usage();
+    if end.len() != 1 {
+        eprintln!(
+            "ERROR: unexpected '{}' after size argument '{}'",
+            &end[1..],
+            p
+        );
+        usage();
     }
 
     ret * mult
@@ -115,17 +132,10 @@ fn parseSize(arg: String,  p: String) -> UInt {
 
 /* parse all the arguments */
 fn parseArgs() -> String {
-    let mut mainMod: = String::new();;
-    //C int i;
+    let mut mainMod = String::new();
 
     /* initialize options */
-    // std::env::args().len()
-
-    unsafe {
-        G_progName
-            .as_mut_ptr()
-            .write(Box::leak(std::env::args().nth(0).unwrap().into_boxed_str()))
-    };
+    unsafe { G_progName = Some(std::env::args().nth(0).unwrap()) };
 
     let mut parsedOptions = Options {
         heapSize: DEFAULT_HEAP_SIZE,
@@ -134,15 +144,11 @@ fn parseArgs() -> String {
         pretty: false,
     };
 
-    //ERRROR parsedOptions.heapSize = ;
-
-    let mut remaining_arg_start: usize = 0;
-
     /* parse arguments */
 
     let mut i: usize = 1;
 
-    while i < std::env::args().len() { 
+    while i < std::env::args().len() {
         let arg = std::env::args().nth(i).unwrap();
         let next = std::env::args().nth(i + 1);
 
@@ -152,63 +158,104 @@ fn parseArgs() -> String {
             break;
         }
 
-        if arg == "-h" || arg== "--heap"{
+        if arg == "-h" || arg == "--heap" {
             if next.is_none() {
-              eprintln!("ERROR: expected heap size after option {}", arg);
-              usage();
+                eprintln!("ERROR: expected heap size after option {}", arg);
+                usage();
             }
             parsedOptions.heapSize = parseSize(arg, next.unwrap());
             i += 1; // skip size
-          } else if arg == "-s" || arg == "--stack" {
+        } else if arg == "-s" || arg == "--stack" {
             if next.is_none() {
-              eprintln!("ERROR: expected stack size after option {}", arg);
-              usage();
+                eprintln!("ERROR: expected stack size after option {}", arg);
+                usage();
             }
             parsedOptions.maxStackSize = parseSize(arg, next.unwrap());
             i += 1; // skip size
-          }  else if arg == "-stats"{
+        } else if arg == "-stats" {
             parsedOptions.stats = true;
-          } else if arg == "-dump"{
+        } else if arg == "-dump" {
             parsedOptions.pretty = true;
-          } else if arg == "-v" ||
-          arg == "-version" ||
-           arg == "--version" {
-           version();
-           exit(0)
-         } else {
-           eprintln!("WARNING: ignored unknown flag '{}'", arg);
-         }
+        } else if arg == "-v" || arg == "-version" || arg == "--version" {
+            version();
+            process::exit(0);
+        } else {
+            eprintln!("WARNING: ignored unknown flag '{}'", arg);
+        }
 
-         i += 1;
+        i += 1;
     }
 
-    unsafe { G_options.as_mut_ptr().write(parsedOptions) }
+    unsafe { G_options = Some(parsedOptions) }
 
     /* check we have a main module */
-    // if !mainMod {
-    //     usage();
-    // }
-
-    if mainMod.len() == 0 {
+    if mainMod.is_empty() {
         usage();
     }
 
     /* store argument information */
-    unsafe { G_argc.as_mut_ptr.write(std::env::args().len() - i) }
-    // G_argv = &argv[i];
+    unsafe { G_argc = std::env::args().len() - i }
+
+    unsafe {
+        G_argv = Some((&std::env::args().collect::<Vec<String>>()[i..]).to_vec());
+    }
+
+    println!("{:?}", unsafe {
+        G_argv
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_str())
+            .collect::<Vec<&str>>()
+    });
 
     /* get yhc base path */
-    // G_yhcBasePath = basepath_get();
+    unsafe { G_yhcBasePath = basepath::basepath_get() }
 
     return mainMod;
 }
-// {:#?}
 
-// {:?}
+/* initialize program */
+fn init(
+    mainMod: String,
+    mainFunc: &mut Option<node::Node>,
+    _toplevel: &mut Option<node::Node>,
+    _driver: &mut Option<node::FInfo>,
+) {
+    /* inits */
+    // sanity_init();
+
+    heap::heap_init(unsafe { G_options.heapSize });
+
+    //C   #ifdef HAT
+    //C     hgm_init(mainMod);
+    //C   #endif
+
+    // mod_init();
+
+    /* load all globals */
+    // initGlobals(mainMod, mainFunc, _toplevel, _driver);
+
+    /* initialize the threads system */
+    // yhi_thread_init();
+    // hsffi_init();
+
+    /* finished with the module system now */
+    /* mod_exit(); ... not any more, now we still need it! */
+}
 
 // main.c
 fn main() {
     /* parse program arguments */
     let mainMod = parseArgs();
-    parseArgs();
+
+    let mut _toplevel: Option<node::Node> = None;
+    let mut mainFunc: Option<node::Node> = None;
+    let mut _driver: Option<node::FInfo> = None;
+
+    /* initialize */
+    init(mainMod, &mut mainFunc, &mut _toplevel, &mut _driver);
+
+    // println!("{}", parseSize(String::from("--heap"), String::from("2K")));
+    // "ABCD", "1A", "2b", "3.6G"
 }

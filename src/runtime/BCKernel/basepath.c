@@ -73,14 +73,15 @@ static Char* basepath_guess(){
   n = strlen(last);
   path = malloc((n + 2) * sizeof(Char));
   memcpy(path, last, n * sizeof(Char));
-  path[n] = SEPARATOR;
-  path[n+1] = 0;
-  last = path;
+  path[n] = SEPARATOR; // add separator to end
+  path[n+1] = 0; // null-terminate
+  last = path; // starting pointer to PATH cstr
   
   for (p = path; *p; p++){
     if (*p != SEPARATOR){
       continue;
     }
+    // *p == SEPARATOR
     *p = '\0';
     
     /* search for progname in that directory */
@@ -92,7 +93,7 @@ static Char* basepath_guess(){
     if (res) goto finish;
 #endif
     
-    last = p+1;
+    last = p+1; // skip SEPARATOR
   }
   /* not found! */
   res = NULL;
