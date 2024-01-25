@@ -40,6 +40,9 @@ static mut G_spLimit: Option<&&Node> = None;
 static mut G_fp: Option<&Frame> = None;
 
 pub fn heap_init(heapSize: UInt){
+  println!("{}", heapSize);
+  unimplemented!()
+  /*
   let wSize  = heapSize / sizeof(Word);
 
   unsafe { 
@@ -59,5 +62,5 @@ pub fn heap_init(heapSize: UInt){
     // G_spBase = G_spLimit = G_sp = G_fp = NULL;
     
     }
-
+   */
 }

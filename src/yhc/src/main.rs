@@ -225,7 +225,7 @@ fn init(
     /* inits */
     // sanity_init();
 
-    heap::heap_init(unsafe { G_options.heapSize });
+    heap::heap_init(unsafe { G_options.unwrap().heapSize });
 
     //C   #ifdef HAT
     //C     hgm_init(mainMod);
